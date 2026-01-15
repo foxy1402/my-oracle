@@ -389,92 +389,117 @@ def get_timestamp() -> str:
 
 def background_loop(config: Config, oci_client: OCIClient, notifier: TelegramNotifier):
     """Background loop that attempts to create the instance."""
+    import traceback
     global app_state
     
-    app_state["status"] = "running"
-    app_state["start_time"] = datetime.now()
-    app_state["retry_interval"] = config.retry_interval
-    app_state["region"] = config.oci_region
-    app_state["ocpus"] = config.ocpus
-    app_state["memory_gb"] = config.memory_gb
-    
-    print(f"[{get_timestamp()}] 🚀 Background loop started")
-    print(f"   • Target: VM.Standard.A1.Flex in {config.oci_region}")
-    print(f"   • Retry interval: {config.retry_interval} seconds")
-    
-    # Send startup notification
-    notifier.send_startup_message()
-    
-    while True:
-        app_state["attempt"] += 1
-        app_state["last_attempt_time"] = get_timestamp()
+    try:
+        app_state["status"] = "running"
+        app_state["start_time"] = datetime.now()
+        app_state["retry_interval"] = config.retry_interval
+        app_state["region"] = config.oci_region
+        app_state["ocpus"] = config.ocpus
+        app_state["memory_gb"] = config.memory_gb
         
-        print(f"[{get_timestamp()}] Attempt #{app_state['attempt']} - Trying to create instance...")
+        print(f"[{get_timestamp()}] 🚀 Background loop started", flush=True)
+        print(f"   • Target: VM.Standard.A1.Flex in {config.oci_region}", flush=True)
+        print(f"   • Retry interval: {config.retry_interval} seconds", flush=True)
         
+        # Send startup notification (non-blocking)
         try:
-            result = oci_client.create_instance()
-            
-            if result["success"]:
-                # SUCCESS!
-                app_state["status"] = "success"
-                app_state["instance_created"] = True
-                app_state["instance_info"] = result["instance"]
-                app_state["last_result"] = f"✅ Instance created successfully!"
-                
-                print(f"\n🎉 SUCCESS! Instance created on attempt #{app_state['attempt']}")
-                print(f"   Instance ID: {result['instance']['id']}")
-                print(f"   Public IP: {result['instance']['public_ip']}")
-                
-                # Send Telegram notification
-                notifier.send_success_message(result["instance"])
-                
-                # Don't exit - keep web server running to show success
-                print("✅ Instance created! Web server will keep running to display status.")
-                break
-            
-            elif result["is_capacity_error"]:
-                app_state["last_result"] = f"⏳ Out of capacity. Retrying in {config.retry_interval}s..."
-                print(f"[{get_timestamp()}] ⏳ Out of capacity. Retrying in {config.retry_interval}s...")
-            
-            else:
-                app_state["last_result"] = f"❌ {result['message']}"
-                print(f"[{get_timestamp()}] ❌ Error: {result['message']}")
-        
+            notifier.send_startup_message()
         except Exception as e:
-            app_state["last_result"] = f"❌ Exception: {str(e)}"
-            print(f"[{get_timestamp()}] ❌ Exception: {e}")
+            print(f"[{get_timestamp()}] ⚠️ Failed to send startup notification: {e}", flush=True)
         
-        time.sleep(config.retry_interval)
+        while True:
+            app_state["attempt"] += 1
+            app_state["last_attempt_time"] = get_timestamp()
+            
+            print(f"[{get_timestamp()}] Attempt #{app_state['attempt']} - Trying to create instance...", flush=True)
+            
+            try:
+                result = oci_client.create_instance()
+                
+                if result["success"]:
+                    # SUCCESS!
+                    app_state["status"] = "success"
+                    app_state["instance_created"] = True
+                    app_state["instance_info"] = result["instance"]
+                    app_state["last_result"] = f"✅ Instance created successfully!"
+                    
+                    print(f"\n🎉 SUCCESS! Instance created on attempt #{app_state['attempt']}", flush=True)
+                    print(f"   Instance ID: {result['instance']['id']}", flush=True)
+                    print(f"   Public IP: {result['instance']['public_ip']}", flush=True)
+                    
+                    # Send Telegram notification
+                    try:
+                        notifier.send_success_message(result["instance"])
+                    except Exception as e:
+                        print(f"[{get_timestamp()}] ⚠️ Failed to send success notification: {e}", flush=True)
+                    
+                    # Don't exit - keep web server running to show success
+                    print("✅ Instance created! Web server will keep running to display status.", flush=True)
+                    break
+                
+                elif result["is_capacity_error"]:
+                    app_state["last_result"] = f"⏳ Out of capacity. Retrying in {config.retry_interval}s..."
+                    print(f"[{get_timestamp()}] ⏳ Out of capacity. Retrying in {config.retry_interval}s...", flush=True)
+                
+                else:
+                    app_state["last_result"] = f"❌ {result['message']}"
+                    print(f"[{get_timestamp()}] ❌ Error: {result['message']}", flush=True)
+            
+            except Exception as e:
+                app_state["last_result"] = f"❌ Exception: {str(e)}"
+                print(f"[{get_timestamp()}] ❌ Exception in create_instance: {e}", flush=True)
+                print(traceback.format_exc(), flush=True)
+            
+            time.sleep(config.retry_interval)
+    
+    except Exception as e:
+        app_state["status"] = "error"
+        app_state["error_message"] = f"Background loop crashed: {str(e)}"
+        app_state["last_result"] = f"❌ FATAL: {str(e)}"
+        print(f"[{get_timestamp()}] ❌ FATAL ERROR in background loop: {e}", flush=True)
+        print(traceback.format_exc(), flush=True)
 
 
 def start_background_worker():
     """Initialize and start the background worker thread."""
+    import traceback
     global app_state
     
     try:
-        print("Loading configuration...")
+        print("Loading configuration...", flush=True)
         config = Config()
         
         # Validate configuration first
         if not config.validate():
             app_state["status"] = "error"
             app_state["error_message"] = "Configuration validation failed"
-            print("❌ Configuration validation failed")
+            print("❌ Configuration validation failed", flush=True)
             return
+        
+        print("✅ Configuration validated successfully", flush=True)
         
         # Initialize clients
         oci_client = OCIClient(config)
         notifier = TelegramNotifier(config)
         
         # Validate OCI credentials
-        print("Validating OCI credentials...")
+        print("Validating OCI credentials...", flush=True)
         if not oci_client.validate_credentials():
             app_state["status"] = "error"
             app_state["error_message"] = "OCI credential validation failed"
-            print("❌ OCI credential validation failed")
+            print("❌ OCI credential validation failed", flush=True)
             return
         
-        print("✅ Configuration and credentials validated")
+        print("✅ OCI credentials validated successfully", flush=True)
+        
+        # Set initial state with config values
+        app_state["retry_interval"] = config.retry_interval
+        app_state["region"] = config.oci_region
+        app_state["ocpus"] = config.ocpus
+        app_state["memory_gb"] = config.memory_gb
         
         # Start background thread
         thread = threading.Thread(
@@ -483,17 +508,19 @@ def start_background_worker():
             daemon=True
         )
         thread.start()
-        print("✅ Background worker thread started")
+        print("✅ Background worker thread started", flush=True)
         
     except ValueError as e:
         app_state["status"] = "error"
         app_state["error_message"] = f"Configuration error: {str(e)}"
-        print(f"❌ Configuration error: {e}")
+        print(f"❌ Configuration error: {e}", flush=True)
+        print(traceback.format_exc(), flush=True)
     
     except Exception as e:
         app_state["status"] = "error"
         app_state["error_message"] = f"Startup error: {str(e)}"
-        print(f"❌ Startup error: {e}")
+        print(f"❌ Startup error: {e}", flush=True)
+        print(traceback.format_exc(), flush=True)
 
 
 # ============================================================================
