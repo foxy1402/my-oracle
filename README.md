@@ -367,9 +367,11 @@ ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDLqp7Xk3Fqpz123abc...very long string...xy
 
 ---
 
-### Option 2: Deploy to Render.com (Free 24/7)
+### Option 2: Deploy to Render.com (Free Web Service)
 
-Render.com is a free hosting platform that can run your script 24/7.
+Render.com's **free Web Service** can run your script 24/7 with a status dashboard.
+
+> **Note:** Background Workers require a paid plan, so we use a Web Service instead.
 
 #### Step 1: Push Code to GitHub (Already Done! ✅)
 
@@ -381,10 +383,10 @@ Your code is at: `https://github.com/foxy1402/my-oracle`
 2. Click **Get Started for Free**
 3. Sign up with **GitHub** (recommended for easy connection)
 
-#### Step 3: Create Background Worker
+#### Step 3: Create Web Service
 
 1. Go to **[Render Dashboard](https://dashboard.render.com/)**
-2. Click **New +** → **Background Worker**
+2. Click **New +** → **Web Service**
 3. Connect your GitHub account if prompted
 4. Select repository: `foxy1402/my-oracle`
 5. Configure:
@@ -392,12 +394,13 @@ Your code is at: `https://github.com/foxy1402/my-oracle`
    - **Region:** Singapore (or any)
    - **Branch:** `main`
    - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `python main.py`
-6. Click **Create Background Worker**
+   - **Start Command:** `gunicorn web_app:app`
+6. Select **Free** plan
+7. Click **Create Web Service**
 
 #### Step 4: Add Environment Variables
 
-1. In your Background Worker, go to **Environment** tab
+1. In your Web Service, go to **Environment** tab
 2. Click **Add Environment Variable** for each:
 
 | Key | Value |
@@ -436,19 +439,20 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 -----END RSA PRIVATE KEY-----
 ```
 
-#### Step 5: Deploy
+#### Step 5: Deploy & Monitor
 
 1. Click **Save Changes** after adding all environment variables
-2. Render will automatically build and deploy your worker
-3. Check the **Logs** tab to see if it's running
+2. Render will automatically build and deploy your service
+3. Once deployed, click the URL (e.g., `https://oracle-auto-register.onrender.com`)
+4. You'll see a **live status dashboard** showing:
+   - Current status (searching/success/error)
+   - Number of attempts
+   - Uptime
+   - Last attempt result
 
-You should see output like:
-```
-Loading configuration...
-🚀 Starting auto-register loop...
-   • Target: VM.Standard.A1.Flex in ap-singapore-2
-   • Retry interval: 60 seconds
-```
+The dashboard auto-refreshes every 30 seconds. You can also check the **Logs** tab in Render.
+
+> **Tip:** Render's free tier may spin down after 15 minutes of inactivity. The service will restart automatically when accessed. Use an external service like [UptimeRobot](https://uptimerobot.com/) to ping your URL every 5 minutes to keep it alive.
 
 ---
 
@@ -493,8 +497,8 @@ Loading configuration...
    - Stick to one running instance of this script
 
 4. **Render Free Tier**
-   - Background workers may spin down after inactivity
-   - Use your external cron job to ping the service periodically to keep it alive
+   - Web services may spin down after 15 minutes of inactivity
+   - Use [UptimeRobot](https://uptimerobot.com/) to ping your URL every 5 minutes to keep it alive
 
 ---
 
