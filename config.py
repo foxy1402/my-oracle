@@ -18,8 +18,14 @@ class Config:
         self.oci_user_ocid = self._get_required("OCI_USER_OCID")
         self.oci_tenancy_ocid = self._get_required("OCI_TENANCY_OCID")
         self.oci_fingerprint = self._get_required("OCI_FINGERPRINT")
-        self.oci_private_key_path = self._get_required("OCI_PRIVATE_KEY_PATH")
         self.oci_region = os.getenv("OCI_REGION", "ap-singapore-1")
+        
+        # Support both file path and direct content (for platforms like Render)
+        self.oci_private_key_path = os.getenv("OCI_PRIVATE_KEY_PATH")
+        self.oci_private_key_content = os.getenv("OCI_PRIVATE_KEY_CONTENT")
+        
+        if not self.oci_private_key_path and not self.oci_private_key_content:
+             raise ValueError("Missing OCI private key. Set OCI_PRIVATE_KEY_PATH or OCI_PRIVATE_KEY_CONTENT.")
         
         # Instance Configuration
         self.compartment_ocid = self._get_required("OCI_COMPARTMENT_OCID")
@@ -47,20 +53,36 @@ class Config:
     
     def get_oci_config(self) -> dict:
         """Return OCI configuration dictionary for SDK."""
-        return {
+        config = {
             "user": self.oci_user_ocid,
             "tenancy": self.oci_tenancy_ocid,
             "fingerprint": self.oci_fingerprint,
-            "key_file": self.oci_private_key_path,
             "region": self.oci_region,
         }
+        
+        if self.oci_private_key_content:
+            # Clean up the key content (handle newlines from env vars)
+            key_content = self.oci_private_key_content.replace("\\n", "\n")
+            if "-----BEGIN RSA PRIVATE KEY-----" not in key_content:
+                 # Try to fix if it's just the body or has other formatting issues
+                 # This is a basic attempt, user should provide correct format
+                 pass
+            config["key_content"] = key_content
+        else:
+            config["key_file"] = self.oci_private_key_path
+            
+        return config
     
     def validate(self) -> bool:
         """Validate that all required configurations are present."""
         try:
-            # Check if private key file exists
-            if not os.path.exists(self.oci_private_key_path):
+            # Check for private key
+            if self.oci_private_key_path and not os.path.exists(self.oci_private_key_path):
                 print(f"❌ Private key file not found: {self.oci_private_key_path}")
+                return False
+            
+            if not self.oci_private_key_path and not self.oci_private_key_content:
+                print("❌ No private key provided (file or content)")
                 return False
             
             # Basic OCID format validation
