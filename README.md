@@ -394,7 +394,7 @@ Your code is at: `https://github.com/foxy1402/my-oracle`
    - **Region:** Singapore (or any)
    - **Branch:** `main`
    - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `gunicorn web_app:app`
+   - **Start Command:** `gunicorn -c gunicorn.conf.py web_app:app`
 6. Select **Free** plan
 7. Click **Create Web Service**
 

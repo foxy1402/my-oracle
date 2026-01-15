@@ -527,11 +527,16 @@ def start_background_worker():
 # Entry Point
 # ============================================================================
 
-# Start background worker when app loads
-start_background_worker()
+# NOTE: When running with gunicorn, the background worker is started via
+# the post_fork hook in gunicorn.conf.py to ensure it runs in the same
+# process as web request handlers (shared memory for app_state).
 
+# Only auto-start when running directly (not via gunicorn)
 if __name__ == "__main__":
-    # For local development
+    # For local development, start the background worker here
+    start_background_worker()
+    
     port = int(os.environ.get("PORT", 5000))
     print(f"\n🌐 Starting web server on port {port}...")
     app.run(host="0.0.0.0", port=port, debug=False)
+
