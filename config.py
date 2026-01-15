@@ -18,7 +18,7 @@ class Config:
         self.oci_user_ocid = self._get_required("OCI_USER_OCID")
         self.oci_tenancy_ocid = self._get_required("OCI_TENANCY_OCID")
         self.oci_fingerprint = self._get_required("OCI_FINGERPRINT")
-        self.oci_region = os.getenv("OCI_REGION", "ap-singapore-1")
+        self.oci_region = os.getenv("OCI_REGION", "ap-singapore-2")
         
         # Support both file path and direct content (for platforms like Render)
         self.oci_private_key_path = os.getenv("OCI_PRIVATE_KEY_PATH")
